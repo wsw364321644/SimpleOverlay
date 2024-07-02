@@ -54,7 +54,7 @@ install(
 
 FetchContent_Declare(
   overlay-util
-  GIT_REPOSITORY git@github.com:wsw364321644/overlay-util.git
+  GIT_REPOSITORY git@ssh.github.com:wsw364321644/overlay-util.git
   GIT_TAG ${OVERLAY_UTIL_TAG}
   GIT_SUBMODULES_RECURSE true
 )
