@@ -7,22 +7,24 @@ set(MY_PRODUCT_VERSION 0)
 set(MY_BUILD_NUMBER 0)
 set(VERSION "${MY_PRODUCT_NUMBER}.${MY_PRODUCT_VERSION}.${MY_BUILD_NUMBER}")
 
-set(OVERLAY_UTIL_TAG 90a2652843dd85aadc90521500bf4d021f6ad653)
-
-option(OVERLAY_STATIC_CRT "OVERLAY STATIC CRT Build ." OFF)
-
-if(OVERLAY_STATIC_CRT)
-  if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-  endif()
-
-  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
-  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
-endif()
+set(OVERLAY_UTIL_TAG 441250dfddba8d53b52e69a5cefb371d2188af9d)
 
 project(simple_overlay VERSION ${VERSION})
 enable_language(CXX ASM)
+
+option(OVERLAY_STATIC_CRT "OVERLAY STATIC CRT Build ." OFF)
+
+if(PROJECT_IS_TOP_LEVEL)
+  if(OVERLAY_STATIC_CRT)
+    if(MSVC)
+      set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+      add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    endif()
+
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+  endif()
+endif()
 
 set(OBS_URL https://github.com/obsproject/obs-studio/releases/download/30.2.0-rc1/OBS-Studio-30.2.0-rc1-Windows.zip)
 set(OBS_DIR ${CMAKE_SOURCE_DIR}/external/obs)
@@ -35,22 +37,22 @@ execute_process(COMMAND ${CMAKE_COMMAND} --build . --config Release
 install(
   FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets32.exe"
   DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-  )
+)
 
 install(
   FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets64.exe"
   DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-  )
+)
 
 install(
   FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/inject-helper32.exe"
   DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-  )
+)
 
 install(
   FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/inject-helper64.exe"
   DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-  )
+)
 
 FetchContent_Declare(
   overlay-util
