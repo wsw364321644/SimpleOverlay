@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.24)
+include(FetchContent)
+project(download_obs)
+
+set(DEFAULT_URL https://cdn-fastly.obsproject.com/downloads/OBS-Studio-30.1.2.zip)
+
+set(url @OBS_URL@)
+# set(hash af02b88cc922e7506c6659737560c0756deee24e4e7741d4b315af341edd8b40)
+
+if(url STREQUAL  "")
+  set(url ${DEFAULT_URL})
+elseif(NOT url)
+  set(url ${DEFAULT_URL})
+endif()
+if(hash)
+    FetchContent_Declare(obs
+        URL ${url}
+        URL_HASH SHA3_256=${hash}
+        DOWNLOAD_NO_EXTRACT false
+        DOWNLOAD_EXTRACT_TIMESTAMP false
+    )
+else()
+    FetchContent_Declare(obs
+        URL ${url}
+        DOWNLOAD_NO_EXTRACT false
+        DOWNLOAD_EXTRACT_TIMESTAMP false
+    )
+endif()
+
+FetchContent_MakeAvailable(obs)
