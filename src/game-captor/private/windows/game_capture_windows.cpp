@@ -51,6 +51,13 @@ bool FGameCaptureWindows::Init(const char* workpath)
         return true;
     }
 
+
+    if (workpath) {
+        Workpath = std::filesystem::path(workpath);
+    }
+    else {
+        return false;
+    }
     IpcServer = NewMessageServer({ EMessageFoundation::LIBUV });
     IpcServer->OpenServer(EMessageConnectionType::EMCT_IPC, HOOK_IPC_PIPE);
     IpcServer->AddOnConnectDelegate(
@@ -97,20 +104,9 @@ bool FGameCaptureWindows::Init(const char* workpath)
     );
 
 
-
-    if (workpath) {
-        Workpath = std::filesystem::path(workpath);
-    }
-    else {
-        Workpath = std::filesystem::current_path();
-        if (Workpath.filename().string().find("bin") != std::string::npos) {
-            Workpath = Workpath.parent_path();
-        }
-
-    }
     auto init64 = std::thread([&]() {
         {
-            auto fpath = Workpath / "bin" / "get-graphics-offsets64.exe";
+            auto fpath = Workpath/ "get-graphics-offsets64.exe";
             if (!std::filesystem::exists(fpath)) {
                 return;
             }
@@ -144,7 +140,7 @@ bool FGameCaptureWindows::Init(const char* workpath)
     init64.join();
     auto init32 = std::thread([&]() {
         {
-            auto fpath = Workpath / "bin" / "get-graphics-offsets32.exe";
+            auto fpath = Workpath/ "get-graphics-offsets32.exe";
             if (!std::filesystem::exists(fpath)) {
                 return;
             }
@@ -450,20 +446,20 @@ bool FGameCaptureWindows::InjectHook(LocalHookInfo_t* info)
     std::filesystem::path inject_path, hook_path;
 
     if (info->b64bit) {
-        inject_path = Workpath /"bin"/ "inject-helper64.exe";
+        inject_path = Workpath / "inject-helper64.exe";
 #ifdef NDEBUG
-        hook_path = Workpath / "sdk" /"x64"/ "graphics_hook64.dll";
+        hook_path = Workpath/ "graphics_hook64.dll";
 #else
         //hook_path = "C:/Project/SDK/build64/rundir/sdk/bin/graphics_hook64.dll";
-        hook_path = "C:/Project/SDK/build64/bin/Debug/graphics_hook64.dll";
+        hook_path = "C:/Project/SimpleOverlayDll/build_core64/bin/Debug/graphics_hook64.dll";
 #endif
     }
     else {
-        inject_path = Workpath /"bin"/ "inject-helper32.exe";
+        inject_path = Workpath / "inject-helper32.exe";
 #ifdef NDEBUG
-        hook_path = Workpath / "sdk" /"x86"/ "graphics_hook32.dll";
+        hook_path = Workpath/ "graphics_hook32.dll";
 #else
-        hook_path = "C:/Project/SDK/build/rundir/sdk/bin/graphics_hook32.dll";
+        hook_path = "C:/Project/SimpleOverlayDll/build_core64/bin/Debug/graphics_hook32.dll";
 #endif
     }
     if (!std::filesystem::exists(inject_path)) {

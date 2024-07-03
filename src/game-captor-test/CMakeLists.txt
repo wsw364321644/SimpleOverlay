@@ -1,0 +1,18 @@
+NewTargetSource()
+AddSourceFolder(INCLUDE RECURSE PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/public")
+AddSourceFolder(RECURSE "${CMAKE_CURRENT_SOURCE_DIR}/private")
+source_group(TREE ${PROJECT_SOURCE_DIR} FILES ${SourceFiles})
+
+set(TARGET_NAME game_captor_test)
+add_executable(${TARGET_NAME} ${SourceFiles})
+set_target_properties(${TARGET_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin)
+set_target_properties(${TARGET_NAME} PROPERTIES FOLDER "hook")
+target_compile_features(${TARGET_NAME} PRIVATE cxx_std_20)
+
+target_link_libraries(${TARGET_NAME} PRIVATE simple_utilpp)
+target_link_libraries(${TARGET_NAME} PRIVATE ipc_util)
+target_link_libraries(${TARGET_NAME} PRIVATE windows_util)
+target_link_libraries(${TARGET_NAME} PRIVATE simple_logger)
+target_link_libraries(${TARGET_NAME} PRIVATE game_captor)
+target_link_libraries(${TARGET_NAME} PRIVATE graphic_subsystem)
+target_link_libraries(${TARGET_NAME} PRIVATE simple_hook_helper)

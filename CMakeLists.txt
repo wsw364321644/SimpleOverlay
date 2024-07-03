@@ -66,3 +66,4 @@ ImportTarget(inih SSH TAG 5cc5e2c24642513aaa5b19126aad42d0e4e0923e) # r58
 
 find_package(LIBUV REQUIRED)
 add_subdirectory(src/game-captor)
+add_subdirectory(src/game-captor-test)
