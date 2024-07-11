@@ -16,7 +16,7 @@ struct LocalHookWindowInfo_t;
 class FGraphicSubsystemDXGITexture;
 class FGraphicSubsystemTexture;
 typedef struct LocalHookWindowInfo_t :CaptureWindowHandle_t {
-
+	bool bRequestRemove{ false };
 	hook_window_info_t* SharedInfo;
 	CommonHandle_t* SharedMemHandle;
 	uint64_t WindowID{ 0 };
@@ -91,7 +91,8 @@ public:
 	bool Init(const char* workpath) override;
 	ThroughCRTWrapper<std::shared_ptr<CaptureProcessHandle_t>> StartCapture(uint64_t processid) override;
 	ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> AddOverlayWindow(CaptureProcessHandle_t* handle,const hook_window_info_t info) override;
-	bool CopyData(ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, const uint8_t* data) override;
+	void RemoveOverlayWindow(CaptureWindowHandle_t* windowHanlde) override;
+	bool CopyData(CaptureWindowHandle_t* handle, const uint8_t* data) override;
 
 private:
 	bool IsCapturing(LocalHookInfo_t* info);

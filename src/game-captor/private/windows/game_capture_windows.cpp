@@ -100,6 +100,51 @@ bool FGameCaptureWindows::Init(const char* workpath)
                     HookHelperEventInterface->HotkeyListUpdate(list);
                 }
             );
+
+            HookHelperEventInterface->RegisterOverlayMouseMotionEvent([&](uint64_t winId, mouse_motion_event_t& e) {
+                auto itr = LocalWindowInfos.find(winId);
+                if (itr == LocalWindowInfos.end()) {
+                    return;
+                }
+                auto pWinInfo=itr->second;
+                pWinInfo->TriggerMouseMotionEventDelegates(std::dynamic_pointer_cast<CaptureWindowHandle_t>(pWinInfo),e);
+                });
+
+            HookHelperEventInterface->RegisterOverlayMouseButtonEvent([&](uint64_t winId, mouse_button_event_t& e) {
+                auto itr = LocalWindowInfos.find(winId);
+                if (itr == LocalWindowInfos.end()) {
+                    return;
+                }
+                auto pWinInfo = itr->second;
+                pWinInfo->TriggerMouseButtonEventDelegates(std::dynamic_pointer_cast<CaptureWindowHandle_t>(pWinInfo), e);
+                });
+
+            HookHelperEventInterface->RegisterOverlayMouseWheelEvent([&](uint64_t winId, mouse_wheel_event_t& e) {
+                auto itr = LocalWindowInfos.find(winId);
+                if (itr == LocalWindowInfos.end()) {
+                    return;
+                }
+                auto pWinInfo = itr->second;
+                pWinInfo->TriggerMouseWheelEventDelegates(std::dynamic_pointer_cast<CaptureWindowHandle_t>(pWinInfo), e);
+                });
+
+            HookHelperEventInterface->RegisterOverlayKeyboardEvent([&](uint64_t winId, keyboard_event_t& e) {
+                auto itr = LocalWindowInfos.find(winId);
+                if (itr == LocalWindowInfos.end()) {
+                    return;
+                }
+                auto pWinInfo = itr->second;
+                pWinInfo->TriggerKeyboardEventDelegates(std::dynamic_pointer_cast<CaptureWindowHandle_t>(pWinInfo), e);
+                });
+
+            HookHelperEventInterface->RegisterOverlayWindowEvent([&](uint64_t winId, window_event_t& e) {
+                auto itr = LocalWindowInfos.find(winId);
+                if (itr == LocalWindowInfos.end()) {
+                    return;
+                }
+                auto pWinInfo = itr->second;
+                pWinInfo->TriggerWindowEventDelegates(std::dynamic_pointer_cast<CaptureWindowHandle_t>(pWinInfo), e);
+                });
         }
     );
 
@@ -285,9 +330,35 @@ ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::A
     return std::dynamic_pointer_cast<CaptureWindowHandle_t>(windoInfo);
 }
 
-bool FGameCaptureWindows::CopyData(ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, const uint8_t* data)
+void FGameCaptureWindows::RemoveOverlayWindow( CaptureWindowHandle_t* windowHanlde)
 {
-    auto itr = LocalWindowInfos.find(handle.GetValue()->GetID());
+    auto winId = windowHanlde->GetID();
+    auto windowItr=LocalWindowInfos.find(winId);
+    if (windowItr == LocalWindowInfos.end()) {
+        return;
+    }
+    auto& pLocalWindowInfo=windowItr->second;
+    if (pLocalWindowInfo->bRequestRemove) {
+        return;
+    }
+    pLocalWindowInfo->bRequestRemove = true;
+
+    auto HookHelperInterface = sessionMap[pLocalWindowInfo->Owner->GetID()].PRPCProcesser->GetInterface<JRPCHookHelperAPI>();
+    HookHelperInterface->RemoveWindow(windowHanlde->GetID(),
+        [&, pLocalWindowInfo](RPCHandle_t handle) {
+            GraphicSubsystem->TextureDestroy(pLocalWindowInfo->GraphicSubsystemTexture);
+            UnmapSharedMemory(pLocalWindowInfo->SharedInfo);
+            CloseSharedMemory(pLocalWindowInfo->SharedMemHandle);
+            LocalWindowInfos.erase(pLocalWindowInfo->GetID());
+        },
+        [&, pLocalWindowInfo](RPCHandle_t, double, const char*, const char*) {
+            pLocalWindowInfo->bRequestRemove = false;
+        });
+}
+
+bool FGameCaptureWindows::CopyData(CaptureWindowHandle_t* handle, const uint8_t* data)
+{
+    auto itr = LocalWindowInfos.find(handle->GetID());
     if (itr == LocalWindowInfos.end()) {
         return false;
     }
@@ -345,8 +416,9 @@ void FGameCaptureWindows::CaptureTick(float seconds)
             auto res = WaitForSingleObject(hookInfo->hook_ready, 0);
             if (res == WAIT_OBJECT_0) {
                 hookInfo->status = ECaptureStatus::ECS_Ready;
+                hookInfo->TriggerOnGraphicDataUpdateDelegates(std::dynamic_pointer_cast<CaptureProcessHandle_t>(hookInfo));
             }
-            hookInfo->TriggerOnGraphicDataUpdateDelegates(std::dynamic_pointer_cast<CaptureProcessHandle_t>(hookInfo));
+            
             break;
         }
         case ECaptureStatus::ECS_Ready:{

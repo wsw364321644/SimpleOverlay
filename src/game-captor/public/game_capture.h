@@ -6,6 +6,7 @@
 #include <delegate_macros.h>
 #include <ThroughCRTWrapper.h>
 #include <HOOK/mouse_event.h>
+#include <HOOK/window_event.h>
 #include <HOOK/window_info.h>
 #include <Graphic/GraphicSubsystem.h>
 #include "game_capture_export_defs.h"
@@ -51,6 +52,7 @@ struct GAME_CAPTURE_EXPORT CaptureWindowHandle_t {
 	DEFINE_EVENT_TWO_PARAM(MouseButtonEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, mouse_button_event_t&);
 	DEFINE_EVENT_TWO_PARAM(MouseMotionEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, mouse_motion_event_t&);
 	DEFINE_EVENT_TWO_PARAM(KeyboardEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, keyboard_event_t&);
+	DEFINE_EVENT_TWO_PARAM(WindowEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, window_event_t&);
 };
 
 class GAME_CAPTURE_EXPORT FGameCapture {
@@ -60,7 +62,8 @@ public:
 	virtual bool Init(const char* workpath = nullptr) = 0;
 	virtual ThroughCRTWrapper<std::shared_ptr<CaptureProcessHandle_t>> StartCapture(uint64_t processid) = 0;
 	virtual ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>  AddOverlayWindow(CaptureProcessHandle_t* handle, const hook_window_info_t info) = 0;
-	virtual bool CopyData(ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle,const uint8_t* data) = 0;
+	virtual void RemoveOverlayWindow(CaptureWindowHandle_t* windowHanlde) =0;
+	virtual bool CopyData(CaptureWindowHandle_t* handle,const uint8_t* data) = 0;
 };
 
 GAME_CAPTURE_EXPORT uint64_t get_default_frame_interval();
