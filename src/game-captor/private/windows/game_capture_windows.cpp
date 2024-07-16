@@ -365,15 +365,15 @@ bool FGameCaptureWindows::CopyData(CaptureWindowHandle_t* handle, const uint8_t*
     auto& pwindowInfo=itr->second;
     auto& pcapInfo= pwindowInfo->Owner;
     uint8_t* outPtr;
-    uint32_t linesize;
+    uint32_t RowPitch;
     auto width= pwindowInfo->GraphicSubsystemTexture->GetWidth();
     auto height =  pwindowInfo->GraphicSubsystemTexture->GetHeight();
     auto lineSize=pwindowInfo->GraphicSubsystemTexture->GetByteSize()/ height;
-    if (!GraphicSubsystem->TextureMap(pwindowInfo->GraphicSubsystemTexture, &outPtr, &linesize)) {
+    if (!GraphicSubsystem->TextureMap(pwindowInfo->GraphicSubsystemTexture, &outPtr, &RowPitch)) {
         return false;
     }
     for (int i = 0; i < height; i++) {
-        memcpy(outPtr + i * linesize, data + i * width, lineSize);
+        memcpy(outPtr + i * RowPitch, data + i * lineSize, lineSize);
     }
     GraphicSubsystem->TextureUnmap(pwindowInfo->GraphicSubsystemTexture);
     if (!pwindowInfo->GraphicSubsystemSharedTexture->AcquireSync(0,0)) {
@@ -526,7 +526,7 @@ bool FGameCaptureWindows::InjectHook(LocalHookInfo_t* info)
         hook_path = Workpath/ "graphics_hook64.dll";
 #else
         //hook_path = "C:/Project/SDK/build64/rundir/sdk/bin/graphics_hook64.dll";
-        hook_path = "C:/Project/SimpleOverlayDll/build_core64/bin/Debug/graphics_hook64.dll";
+        hook_path = "C:/Project/SimpleOverlayDll/build64/bin/Debug/graphics_hook64.dll";
 #endif
     }
     else {
@@ -534,7 +534,7 @@ bool FGameCaptureWindows::InjectHook(LocalHookInfo_t* info)
 #ifdef NDEBUG
         hook_path = Workpath/ "graphics_hook32.dll";
 #else
-        hook_path = "C:/Project/SimpleOverlayDll/build_core64/bin/Debug/graphics_hook32.dll";
+        hook_path = "C:/Project/SimpleOverlayDll/build64/bin/Debug/graphics_hook32.dll";
 #endif
     }
     if (!std::filesystem::exists(inject_path)) {
