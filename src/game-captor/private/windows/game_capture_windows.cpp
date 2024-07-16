@@ -386,6 +386,9 @@ bool FGameCaptureWindows::CopyData(CaptureWindowHandle_t* handle, const uint8_t*
 
 void FGameCaptureWindows::CaptureTick(float seconds)
 {
+    if (!inited) {
+        return;
+    }
     for (auto pair: HookInfos) {
         auto hookInfo = pair.second;
         if (!IsCapturing(hookInfo.get())) {
