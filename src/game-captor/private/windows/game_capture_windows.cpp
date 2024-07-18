@@ -347,8 +347,6 @@ void FGameCaptureWindows::RemoveOverlayWindow( CaptureWindowHandle_t* windowHanl
     HookHelperInterface->RemoveWindow(windowHanlde->GetID(),
         [&, pLocalWindowInfo](RPCHandle_t handle) {
             GraphicSubsystem->TextureDestroy(pLocalWindowInfo->GraphicSubsystemTexture);
-            UnmapSharedMemory(pLocalWindowInfo->SharedInfo);
-            CloseSharedMemory(pLocalWindowInfo->SharedMemHandle);
             LocalWindowInfos.erase(pLocalWindowInfo->GetID());
         },
         [&, pLocalWindowInfo](RPCHandle_t, double, const char*, const char*) {
