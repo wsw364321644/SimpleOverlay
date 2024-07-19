@@ -414,8 +414,9 @@ void FGameCaptureWindows::CaptureTick(float seconds)
             if (!sessionMap.contains(hookInfo->GetID())) {
                 continue;
             }
-            auto res = WaitForSingleObject(hookInfo->hook_ready, 0);
-            if (res == WAIT_OBJECT_0) {
+            auto handle=open_mutex_plus_id(HOOK_READY_KEEPALIVE, hookInfo->GetID(), false);
+            if (handle != NULL) {
+                CloseHandle(handle);
                 hookInfo->status = ECaptureStatus::ECS_Ready;
                 hookInfo->TriggerOnGraphicDataUpdateDelegates(std::dynamic_pointer_cast<CaptureProcessHandle_t>(hookInfo));
             }
@@ -423,8 +424,11 @@ void FGameCaptureWindows::CaptureTick(float seconds)
             break;
         }
         case ECaptureStatus::ECS_Ready:{
-            auto res = WaitForSingleObject(hookInfo->hook_restart, 0);
-            if (res == WAIT_OBJECT_0) {
+            auto handle = open_mutex_plus_id(HOOK_READY_KEEPALIVE, hookInfo->GetID(), false);
+            if (handle != NULL) {
+                CloseHandle(handle);
+            }
+            else {
                 hookInfo->status = ECaptureStatus::ECS_GraphicDataSyncing;
             }
             break;
