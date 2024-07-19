@@ -28,24 +28,39 @@ int main() {
     GetWindowThreadProcessId(handle, &process_id);
 
     auto captureHandle=cap->StartCapture(process_id);
-    ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> windowHandle;
+    ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> bgwindowHandle;
+    std::vector<ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>> windowHandles;
     uint32_t width, height;
+    std::vector<uint8_t> bgwindowImg;
     std::vector<uint8_t> windowImg;
-    uint32_t R = 255;
-    uint32_t G = 0;
-    uint32_t B = 0;
-    uint32_t A = 200;
+    uint32_t bgcolor = 0xc80000FF;
+    uint32_t color = 0xc800FF00;
+
     uint32_t mscount = 50;
     captureHandle.GetValue()->AddOnGraphicDataUpdateDelegate([&,cap](ThroughCRTWrapper<std::shared_ptr<CaptureProcessHandle_t>>captureHandle) {
         width=captureHandle.GetValue()->GetClientWidth();
         height=captureHandle.GetValue()->GetClientHeight();
+        SIMPLELOG_LOGGER_DEBUG(nullptr, "Width:{} Height:{} ", width, height);
+        if (bgwindowHandle.GetValue()) {
+            cap->RemoveOverlayWindow(bgwindowHandle.GetValue());
+        }
+        hook_window_info_t bg_window_info;
+        bg_window_info.hook_window_type = EHookWindowType::Background;
+        bg_window_info.height = height;
+        bg_window_info.width = width;
+        bgwindowHandle = cap->AddOverlayWindow(captureHandle.GetValue(), bg_window_info);
 
         hook_window_info_t hook_window_info;
-        hook_window_info.hook_window_type = EHookWindowType::Background;
-        hook_window_info.height = height;
-        hook_window_info.width = width;
-        windowHandle = cap->AddOverlayWindow(captureHandle.GetValue(), hook_window_info);
-
+        hook_window_info.hook_window_type = EHookWindowType::Window;
+        hook_window_info.height = 800;
+        hook_window_info.width = 1200;
+        hook_window_info.max_height = 800;
+        hook_window_info.max_width = 1200;
+        hook_window_info.min_height = 200;
+        hook_window_info.min_width = 200;
+        hook_window_info.x = 0;
+        hook_window_info.y = 0;
+        auto windowHandle = cap->AddOverlayWindow(captureHandle.GetValue(), hook_window_info);
         windowHandle.GetValue()->AddMouseMotionEventDelegate([](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, mouse_motion_event_t& e) {
             SIMPLELOG_LOGGER_DEBUG(nullptr, "mouse_motion_event_t: x {} y {} dx {} dy {}", e.x, e.y, e.xrel, e.yrel);
             });
@@ -65,16 +80,20 @@ int main() {
         windowHandle.GetValue()->AddWindowEventDelegate([](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, window_event_t& e) {
             SIMPLELOG_LOGGER_DEBUG(nullptr, "window_event_t: event{}", (int)e.event);
             });
-
+        windowHandles.push_back(windowHandle);
         });
     while (true) {
         cap->CaptureTick(0);
         std::this_thread::sleep_for(std::chrono::milliseconds(mscount));
-        if (windowHandle.GetValue()) {
-            windowImg.resize(windowHandle.GetValue()->GetDataSize());
-            uint32_t val = ((A << 8 | R) << 8 | G) << 8 | B;
-            std::fill((uint32_t*)windowImg.data(), (uint32_t*)(windowImg.data()+ windowImg.size()), val);
-            cap->CopyData(windowHandle.GetValue(), windowImg.data());
+        if (bgwindowHandle.GetValue()) {
+            bgwindowImg.resize(bgwindowHandle.GetValue()->GetDataSize());
+            std::fill((uint32_t*)bgwindowImg.data(), (uint32_t*)(bgwindowImg.data()+ bgwindowImg.size()), bgcolor);
+            cap->CopyData(bgwindowHandle.GetValue(), bgwindowImg.data());
+        }
+        for (auto& handle : windowHandles) {
+            windowImg.resize(handle.GetValue()->GetDataSize());
+            std::fill((uint32_t*)windowImg.data(), (uint32_t*)(windowImg.data() + windowImg.size()), color);
+            cap->CopyData(handle.GetValue(), windowImg.data());
         }
 
     }
