@@ -137,6 +137,14 @@ bool FGameCaptureWindows::Init(const char* workpath)
                 pWinInfo->TriggerKeyboardEventDelegates(std::dynamic_pointer_cast<CaptureWindowHandle_t>(pWinInfo), e);
                 });
 
+            HookHelperEventInterface->RegisterOverlayCharEvent([&](uint64_t winId, overlay_char_event_t& e) {
+                auto itr = LocalWindowInfos.find(winId);
+                if (itr == LocalWindowInfos.end()) {
+                    return;
+                }
+                auto pWinInfo = itr->second;
+                pWinInfo->TriggerOverlayCharEventDelegates(std::dynamic_pointer_cast<CaptureWindowHandle_t>(pWinInfo), e);
+                });
             HookHelperEventInterface->RegisterOverlayWindowEvent([&](uint64_t winId, window_event_t& e) {
                 auto itr = LocalWindowInfos.find(winId);
                 if (itr == LocalWindowInfos.end()) {
@@ -286,7 +294,7 @@ ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::A
     //flags.set(ETextureFlag::MISC_SHARED);
     flags.set(ETextureFlag::BIND_SHADER_RESOURCE);
     flags.set(ETextureFlag::BIND_RENDER_TARGET);
-    auto tex= GraphicSubsystem->DeviceTextureCreate(GraphicSubsystemDevice, windoInfo->SharedInfo->width, windoInfo->SharedInfo->height,
+    auto tex= GraphicSubsystem->DeviceTextureCreate(GraphicSubsystemDevice, windoInfo->SharedInfo->render_width, windoInfo->SharedInfo->render_height,
         ConvertDXGITextureFormat((DXGI_FORMAT)plocalInfo->shared_hook_info->format), 1, nullptr, flags);
     if (!tex) {
         return nullptr;
@@ -298,7 +306,7 @@ ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::A
     flags.reset();
     flags.set(ETextureFlag::CPU_ACCESS_WRITE);
     flags.set(ETextureFlag::BIND_SHADER_RESOURCE);
-    windoInfo->GraphicSubsystemTexture = GraphicSubsystem->DeviceTextureCreate(GraphicSubsystemDevice, windoInfo->SharedInfo->width, windoInfo->SharedInfo->height,
+    windoInfo->GraphicSubsystemTexture = GraphicSubsystem->DeviceTextureCreate(GraphicSubsystemDevice, windoInfo->SharedInfo->render_width, windoInfo->SharedInfo->render_height,
         ConvertDXGITextureFormat((DXGI_FORMAT)plocalInfo->shared_hook_info->format), 1, nullptr, flags);
     if (!windoInfo->GraphicSubsystemTexture) {
         return nullptr;
@@ -323,7 +331,7 @@ ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::A
     HookHelperInterface->AddWindow(windoInfo->GetID(), GetNamePlusID(SHMEM_HOOK_WINDOW_INFO, newWindowID).c_str(),
         [](RPCHandle_t handle) {
         },
-        [](RPCHandle_t, double, const char*, const char*) {
+        [](RPCHandle_t, int64_t, const char*, const char*) {
 
         });
 
@@ -349,7 +357,7 @@ void FGameCaptureWindows::RemoveOverlayWindow( CaptureWindowHandle_t* windowHanl
             GraphicSubsystem->TextureDestroy(pLocalWindowInfo->GraphicSubsystemTexture);
             LocalWindowInfos.erase(pLocalWindowInfo->GetID());
         },
-        [&, pLocalWindowInfo](RPCHandle_t, double, const char*, const char*) {
+        [&, pLocalWindowInfo](RPCHandle_t, int64_t, const char*, const char*) {
             pLocalWindowInfo->bRequestRemove = false;
         });
 }

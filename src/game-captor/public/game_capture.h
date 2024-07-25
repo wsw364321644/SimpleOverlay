@@ -7,6 +7,7 @@
 #include <ThroughCRTWrapper.h>
 #include <HOOK/mouse_event.h>
 #include <HOOK/window_event.h>
+#include <HOOK/input_event.h>
 #include <HOOK/window_info.h>
 #include <Graphic/GraphicSubsystem.h>
 #include "game_capture_export_defs.h"
@@ -52,6 +53,7 @@ struct GAME_CAPTURE_EXPORT CaptureWindowHandle_t {
 	DEFINE_EVENT_TWO_PARAM(MouseButtonEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, mouse_button_event_t&);
 	DEFINE_EVENT_TWO_PARAM(MouseMotionEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, mouse_motion_event_t&);
 	DEFINE_EVENT_TWO_PARAM(KeyboardEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, keyboard_event_t&);
+	DEFINE_EVENT_TWO_PARAM(OverlayCharEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, overlay_char_event_t&);
 	DEFINE_EVENT_TWO_PARAM(WindowEvent, ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>>, window_event_t&);
 };
 

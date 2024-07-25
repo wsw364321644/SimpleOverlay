@@ -20,7 +20,7 @@ int main() {
         return 0;
     }
     //auto handle=find_window_by_title("D9GameWindow");
-    auto handle=find_window_by_title("dx9app");
+    auto handle=find_window_by_title("dx11app");
     if (handle == NULL) {
         return 0;
     }
@@ -46,14 +46,14 @@ int main() {
         }
         hook_window_info_t bg_window_info;
         bg_window_info.hook_window_type = EHookWindowType::Background;
-        bg_window_info.height = height;
-        bg_window_info.width = width;
+        bg_window_info.render_height = height;
+        bg_window_info.render_width = width;
         bgwindowHandle = cap->AddOverlayWindow(captureHandle.GetValue(), bg_window_info);
 
         hook_window_info_t hook_window_info;
         hook_window_info.hook_window_type = EHookWindowType::Window;
-        hook_window_info.height = 800;
-        hook_window_info.width = 1200;
+        hook_window_info.render_height = 800;
+        hook_window_info.render_width = 1200;
         hook_window_info.max_height = 800;
         hook_window_info.max_width = 1200;
         hook_window_info.min_height = 200;
@@ -76,7 +76,11 @@ int main() {
         windowHandle.GetValue()->AddKeyboardEventDelegate([](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, keyboard_event_t& e) {
             SIMPLELOG_LOGGER_DEBUG(nullptr, "keyboard_event_t: key_code {} ", (int)e.key_code);
             });   
-        
+
+        windowHandle.GetValue()->AddOverlayCharEventDelegate([](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, overlay_char_event_t& e) {
+            SIMPLELOG_LOGGER_DEBUG(nullptr, "overlay_char_event_t: string {} ", std::string_view(e.char_buf, e.num));
+            });
+
         windowHandle.GetValue()->AddWindowEventDelegate([](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, window_event_t& e) {
             SIMPLELOG_LOGGER_DEBUG(nullptr, "window_event_t: event{}", (int)e.event);
             });
