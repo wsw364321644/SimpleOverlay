@@ -37,12 +37,12 @@ int main() {
     uint32_t color = 0xc800FF00;
 
     uint32_t mscount = 50;
-    captureHandle.GetValue()->AddOnGraphicDataUpdateDelegate([&,cap](ThroughCRTWrapper<std::shared_ptr<CaptureProcessHandle_t>>captureHandle) {
+    captureHandle.GetValue()->AddOnGraphicDataUpdateDelegate([&](ThroughCRTWrapper<std::shared_ptr<CaptureProcessHandle_t>>captureHandle) {
         width=captureHandle.GetValue()->GetClientWidth();
         height=captureHandle.GetValue()->GetClientHeight();
         SIMPLELOG_LOGGER_DEBUG(nullptr, "Width:{} Height:{} ", width, height);
         if (bgwindowHandle.GetValue()) {
-            cap->RemoveOverlayWindow(bgwindowHandle.GetValue());
+            return;
         }
         hook_window_info_t bg_window_info;
         bg_window_info.hook_window_type = EHookWindowType::Background;
@@ -50,17 +50,36 @@ int main() {
         bg_window_info.render_width = width;
         bgwindowHandle = cap->AddOverlayWindow(captureHandle.GetValue(), bg_window_info);
 
+        bgwindowImg.reserve(bgwindowHandle.GetValue()->GetDataSize());
+        std::fill((uint32_t*)bgwindowImg.data(), (uint32_t*)(bgwindowImg.data() + bgwindowHandle.GetValue()->GetDataSize()), bgcolor);
+
+        bgwindowHandle.GetValue()->AddWindowEventDelegate(
+            [&bgwindowImg, bgcolor, cap](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, window_event_t& e) {
+                SIMPLELOG_LOGGER_DEBUG(nullptr, "window_event_t: event{}", (int)e.event);
+                switch (e.event) {
+                case SDL_WindowEventID::SDL_WINDOWEVENT_RESIZED: {
+                    if (cap->UpdateOverlayWindowTextureSize(handle.GetValue(), e.data.win_size.width, e.data.win_size.height)) {
+                        bgwindowImg.reserve(handle.GetValue()->GetDataSize());
+                        std::fill((uint32_t*)bgwindowImg.data(), (uint32_t*)(bgwindowImg.data() + handle.GetValue()->GetDataSize()), bgcolor);
+                    }
+                    break;
+                }
+                }
+            });
+
         hook_window_info_t hook_window_info;
         hook_window_info.hook_window_type = EHookWindowType::Window;
-        hook_window_info.render_height = 800;
-        hook_window_info.render_width = 1200;
+        hook_window_info.render_height = 400;
+        hook_window_info.render_width = 400;
         hook_window_info.max_height = 800;
-        hook_window_info.max_width = 1200;
+        hook_window_info.max_width = 800;
         hook_window_info.min_height = 200;
         hook_window_info.min_width = 200;
         hook_window_info.x = 0;
         hook_window_info.y = 0;
         auto windowHandle = cap->AddOverlayWindow(captureHandle.GetValue(), hook_window_info);
+        windowImg.reserve(windowHandle.GetValue()->GetDataSize());
+        std::fill((uint32_t*)windowImg.data(), (uint32_t*)(windowImg.data() + windowHandle.GetValue()->GetDataSize()), color);
         windowHandle.GetValue()->AddMouseMotionEventDelegate([](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, mouse_motion_event_t& e) {
             SIMPLELOG_LOGGER_DEBUG(nullptr, "mouse_motion_event_t: x {} y {} dx {} dy {}", e.x, e.y, e.xrel, e.yrel);
             });
@@ -81,8 +100,18 @@ int main() {
             SIMPLELOG_LOGGER_DEBUG(nullptr, "overlay_char_event_t: string {} ", std::string_view(e.char_buf, e.num));
             });
 
-        windowHandle.GetValue()->AddWindowEventDelegate([](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, window_event_t& e) {
-            SIMPLELOG_LOGGER_DEBUG(nullptr, "window_event_t: event{}", (int)e.event);
+        windowHandle.GetValue()->AddWindowEventDelegate(
+            [&windowImg, color, cap](ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> handle, window_event_t& e) {
+                SIMPLELOG_LOGGER_DEBUG(nullptr, "window_event_t: event{}", (int)e.event);
+                switch (e.event) {
+                case SDL_WindowEventID::SDL_WINDOWEVENT_RESIZED: {
+                    if (cap->UpdateOverlayWindowTextureSize(handle.GetValue(), e.data.win_size.width, e.data.win_size.height)) {
+                        windowImg.reserve(handle.GetValue()->GetDataSize());
+                        std::fill((uint32_t*)windowImg.data(), (uint32_t*)(windowImg.data() + handle.GetValue()->GetDataSize()), color);
+                    }
+                    break;
+                }
+                }
             });
         windowHandles.push_back(windowHandle);
         });
@@ -90,13 +119,9 @@ int main() {
         cap->CaptureTick(0);
         std::this_thread::sleep_for(std::chrono::milliseconds(mscount));
         if (bgwindowHandle.GetValue()) {
-            bgwindowImg.resize(bgwindowHandle.GetValue()->GetDataSize());
-            std::fill((uint32_t*)bgwindowImg.data(), (uint32_t*)(bgwindowImg.data()+ bgwindowImg.size()), bgcolor);
             cap->CopyData(bgwindowHandle.GetValue(), bgwindowImg.data());
         }
         for (auto& handle : windowHandles) {
-            windowImg.resize(handle.GetValue()->GetDataSize());
-            std::fill((uint32_t*)windowImg.data(), (uint32_t*)(windowImg.data() + windowImg.size()), color);
             cap->CopyData(handle.GetValue(), windowImg.data());
         }
 
