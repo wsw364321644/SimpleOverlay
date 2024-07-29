@@ -79,6 +79,11 @@ bool FGameCaptureWindows::Init(const char* workpath)
             session->AddOnDisconnectDelegate(
                 [&](IMessageSession* session) {
                     sessionMap.erase(session->GetPID());
+                    auto itr = HookInfos.find(session->GetPID());
+                    if (itr == HookInfos.end()) {
+                        return;
+                    }
+                    itr->second->status = ECaptureStatus::ECS_None;
                 }
             );
             auto HookHelperEventInterface = PRPCProcesser->GetInterface<JRPCHookHelperEventAPI>();
@@ -275,67 +280,76 @@ ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::A
         }
     }
 
-    auto windoInfo = std::make_shared<LocalHookWindowInfo_t>();
-    windoInfo->Owner = plocalInfo;
-    windoInfo->WindowID= newWindowID;
-    windoInfo->SharedMemHandle= CreateSharedMemory(GetNamePlusID(SHMEM_HOOK_WINDOW_INFO, newWindowID).c_str(),sizeof(hook_window_info_t));
-    if (!windoInfo->SharedMemHandle || !windoInfo->SharedMemHandle->IsValid()) {
+    auto windowInfo = std::make_shared<LocalHookWindowInfo_t>();
+    windowInfo->Owner = plocalInfo;
+    windowInfo->WindowID= newWindowID;
+    windowInfo->SharedMemHandle= CreateSharedMemory(GetNamePlusID(SHMEM_HOOK_WINDOW_INFO, newWindowID).c_str(),sizeof(hook_window_info_t));
+    if (!windowInfo->SharedMemHandle || !windowInfo->SharedMemHandle->IsValid()) {
         return nullptr;
     }
-    windoInfo->SharedInfo = (hook_window_info_t*)MapSharedMemory(windoInfo->SharedMemHandle);
-    if (!windoInfo->SharedInfo) {
+    windowInfo->SharedInfo = (hook_window_info_t*)MapSharedMemory(windowInfo->SharedMemHandle);
+    if (!windowInfo->SharedInfo) {
         return nullptr;
     }
-    *windoInfo->SharedInfo = info;
+    *windowInfo->SharedInfo = info;
 
-    TextureFlag_t flags;
-    flags.set(ETextureFlag::MISC_SHARED_KEYEDMUTEX);
-    flags.set(ETextureFlag::MISC_SHARED_NTHANDLE);
-    //flags.set(ETextureFlag::MISC_SHARED);
-    flags.set(ETextureFlag::BIND_SHADER_RESOURCE);
-    flags.set(ETextureFlag::BIND_RENDER_TARGET);
-    auto tex= GraphicSubsystem->DeviceTextureCreate(GraphicSubsystemDevice, windoInfo->SharedInfo->render_width, windoInfo->SharedInfo->render_height,
-        ConvertDXGITextureFormat((DXGI_FORMAT)plocalInfo->shared_hook_info->format), 1, nullptr, flags);
-    if (!tex) {
+    if (!InterUpdateOverlayWindowTextureSize(windowInfo.get())) {
         return nullptr;
     }
-    windoInfo->GraphicSubsystemSharedTexture= dynamic_cast<FGraphicSubsystemDXGITexture*>(tex);
-    if (!windoInfo->GraphicSubsystemSharedTexture) {
+    if (!DuplicateWindowTextureHandle(windowInfo.get())) {
+        ReleaseWindowTexture(windowInfo.get());
         return nullptr;
     }
-    flags.reset();
-    flags.set(ETextureFlag::CPU_ACCESS_WRITE);
-    flags.set(ETextureFlag::BIND_SHADER_RESOURCE);
-    windoInfo->GraphicSubsystemTexture = GraphicSubsystem->DeviceTextureCreate(GraphicSubsystemDevice, windoInfo->SharedInfo->render_width, windoInfo->SharedInfo->render_height,
-        ConvertDXGITextureFormat((DXGI_FORMAT)plocalInfo->shared_hook_info->format), 1, nullptr, flags);
-    if (!windoInfo->GraphicSubsystemTexture) {
-        return nullptr;
-    }
-    LocalWindowInfos.emplace(windoInfo->GetID(), windoInfo);
-
-    windoInfo->SharedInfo->bNT_shared = windoInfo->GraphicSubsystemSharedTexture->IsNTShared();
-    HANDLE outHandle= (HANDLE)(intptr_t)windoInfo->GraphicSubsystemSharedTexture->GetSharedHandle();
-    if (windoInfo->SharedInfo->bNT_shared) {
-        HANDLE TargetHandle = (HANDLE)windoInfo->GraphicSubsystemSharedTexture->GetSharedHandle();
-        auto bres = DuplicateHandle(GetCurrentProcess(), TargetHandle,
-            plocalInfo->windowsProcess, &outHandle, 0, FALSE, DUPLICATE_SAME_ACCESS);
-        if (!bres) {
-            auto err = GetLastError();
-            SIMPLELOG_LOGGER_ERROR(nullptr, "DuplicateHandle failed:{}", err);
-            return nullptr;
-        }
-    }
-    windoInfo->SharedInfo->shared_handle =(intptr_t)outHandle;
-    
     auto HookHelperInterface = sessionMap[handle->GetID()].PRPCProcesser->GetInterface<JRPCHookHelperAPI>();
-    HookHelperInterface->AddWindow(windoInfo->GetID(), GetNamePlusID(SHMEM_HOOK_WINDOW_INFO, newWindowID).c_str(),
-        [](RPCHandle_t handle) {
+    windowInfo->UpdateWindowTextureRpcHandle= HookHelperInterface->AddWindow(windowInfo->GetID(), GetNamePlusID(SHMEM_HOOK_WINDOW_INFO, newWindowID).c_str(),
+        [windowInfo](RPCHandle_t handle) {
+            windowInfo->UpdateWindowTextureRpcHandle = NullHandle;
         },
-        [](RPCHandle_t, int64_t, const char*, const char*) {
-
+        [windowInfo](RPCHandle_t, int64_t code, const char*, const char*) {
+            SIMPLELOG_LOGGER_DEBUG(nullptr, "AddWindow rpc error:{}", code);
+            windowInfo->UpdateWindowTextureRpcHandle = NullHandle;
         });
 
-    return std::dynamic_pointer_cast<CaptureWindowHandle_t>(windoInfo);
+    LocalWindowInfos.emplace(windowInfo->GetID(), windowInfo);
+    return std::dynamic_pointer_cast<CaptureWindowHandle_t>(windowInfo);
+}
+
+bool FGameCaptureWindows::UpdateOverlayWindowTextureSize(CaptureWindowHandle_t* windowHanlde,  uint16_t width, uint16_t height)
+{
+    LocalHookWindowInfo_t* windowInfo = dynamic_cast<LocalHookWindowInfo_t*>(windowHanlde);
+    if (windowInfo->SharedInfo->render_width == width && windowInfo->SharedInfo->render_height == height) {
+        return true;
+    }
+    if (windowInfo->Owner->status != ECaptureStatus::ECS_Ready) {
+        return false;
+    }
+    auto cacheWidth = windowInfo->SharedInfo->render_width;
+    auto cacheHeight = windowInfo->SharedInfo->render_height;
+    SyncWindowTextureCache_t syncCache{ .GraphicSubsystemSharedTexture=windowInfo->GraphicSubsystemSharedTexture ,
+        .GraphicSubsystemTexture=windowInfo->GraphicSubsystemTexture };
+
+    auto restoreFn = [&cacheWidth, &cacheHeight, &syncCache, &windowInfo]() {
+        windowInfo->SharedInfo->render_width = cacheWidth;
+        windowInfo->SharedInfo->render_height = cacheHeight;
+        windowInfo->GraphicSubsystemSharedTexture = syncCache.GraphicSubsystemSharedTexture;
+        windowInfo->GraphicSubsystemTexture = syncCache.GraphicSubsystemTexture;
+        };
+    windowInfo->SharedInfo->render_width = width;
+    windowInfo->SharedInfo->render_height = height;
+    
+    if (!InterUpdateOverlayWindowTextureSize(windowInfo)) {
+        restoreFn();
+        return false;
+    }
+    if (windowInfo->bRequestSyncWindowTexture) {
+        ReleaseSyncWindowTextureCache(syncCache);
+    }
+    else {
+        windowInfo->SyncWindowTextureCache=syncCache;
+        windowInfo->bRequestSyncWindowTexture = true;
+    }
+
+    return true;
 }
 
 void FGameCaptureWindows::RemoveOverlayWindow( CaptureWindowHandle_t* windowHanlde)
@@ -349,12 +363,15 @@ void FGameCaptureWindows::RemoveOverlayWindow( CaptureWindowHandle_t* windowHanl
     if (pLocalWindowInfo->bRequestRemove) {
         return;
     }
+    if (pLocalWindowInfo->Owner->status != ECaptureStatus::ECS_Ready) {
+        return;
+    }
     pLocalWindowInfo->bRequestRemove = true;
 
     auto HookHelperInterface = sessionMap[pLocalWindowInfo->Owner->GetID()].PRPCProcesser->GetInterface<JRPCHookHelperAPI>();
     HookHelperInterface->RemoveWindow(windowHanlde->GetID(),
         [&, pLocalWindowInfo](RPCHandle_t handle) {
-            GraphicSubsystem->TextureDestroy(pLocalWindowInfo->GraphicSubsystemTexture);
+            ReleaseWindowTexture(pLocalWindowInfo.get());
             LocalWindowInfos.erase(pLocalWindowInfo->GetID());
         },
         [&, pLocalWindowInfo](RPCHandle_t, int64_t, const char*, const char*) {
@@ -439,11 +456,101 @@ void FGameCaptureWindows::CaptureTick(float seconds)
             else {
                 hookInfo->status = ECaptureStatus::ECS_GraphicDataSyncing;
             }
+            for (auto& pair : LocalWindowInfos) {
+                auto& pWinInfo = pair.second;
+                if (pWinInfo->bRequestSyncWindowTexture&& !pWinInfo->UpdateWindowTextureRpcHandle.IsValid()) {
+                    if (!DuplicateWindowTextureHandle(pWinInfo.get())) {
+                        SIMPLELOG_LOGGER_ERROR(nullptr, "DuplicateWindowTextureHandle error");
+                        continue;
+                    }
+                    auto SyncWindowTextureCache=pWinInfo->SyncWindowTextureCache;
+                    auto HookHelperInterface = sessionMap[pWinInfo->Owner->GetID()].PRPCProcesser->GetInterface<JRPCHookHelperAPI>();
+
+                    pWinInfo->UpdateWindowTextureRpcHandle = HookHelperInterface->UpdateWindowTexture(pWinInfo->GetID(),
+                        [&,pWinInfo, SyncWindowTextureCache](RPCHandle_t handle) {
+                            ReleaseSyncWindowTextureCache(SyncWindowTextureCache);
+                            pWinInfo->UpdateWindowTextureRpcHandle = NullHandle;
+                        },
+                        [&, pWinInfo, SyncWindowTextureCache](RPCHandle_t, int64_t code, const char*, const char*) {
+                            SIMPLELOG_LOGGER_DEBUG(nullptr, "UpdateWindowTexture failed error:{}", code);
+                            ReleaseSyncWindowTextureCache(SyncWindowTextureCache);
+                            pWinInfo->UpdateWindowTextureRpcHandle = NullHandle;
+                        });
+                    pWinInfo->bRequestSyncWindowTexture = false;
+                }
+            }
             break;
         }
         }
     }
     IpcServer->Tick(seconds);
+}
+
+void FGameCaptureWindows::ReleaseWindowTexture(LocalHookWindowInfo_t* windowInfo)
+{
+    if (windowInfo->GraphicSubsystemSharedTexture) {
+        GraphicSubsystem->TextureDestroy(windowInfo->GraphicSubsystemSharedTexture);
+    }
+    if (windowInfo->GraphicSubsystemTexture) {
+        GraphicSubsystem->TextureDestroy(windowInfo->GraphicSubsystemTexture);
+    }
+}
+
+void FGameCaptureWindows::ReleaseSyncWindowTextureCache(SyncWindowTextureCache_t Cache)
+{
+    if (Cache.GraphicSubsystemSharedTexture) {
+        GraphicSubsystem->TextureDestroy(Cache.GraphicSubsystemSharedTexture);
+    }
+    if (Cache.GraphicSubsystemTexture) {
+        GraphicSubsystem->TextureDestroy(Cache.GraphicSubsystemTexture);
+    }
+}
+
+bool FGameCaptureWindows::InterUpdateOverlayWindowTextureSize(LocalHookWindowInfo_t* windowInfo)
+{
+    TextureFlag_t flags;
+    flags.set(ETextureFlag::MISC_SHARED_KEYEDMUTEX);
+    flags.set(ETextureFlag::MISC_SHARED_NTHANDLE);
+    //flags.set(ETextureFlag::MISC_SHARED);
+    flags.set(ETextureFlag::BIND_SHADER_RESOURCE);
+    flags.set(ETextureFlag::BIND_RENDER_TARGET);
+    auto tex = GraphicSubsystem->DeviceTextureCreate(GraphicSubsystemDevice, windowInfo->SharedInfo->render_width, windowInfo->SharedInfo->render_height,
+        ConvertDXGITextureFormat((DXGI_FORMAT)windowInfo->Owner->shared_hook_info->format), 1, nullptr, flags);
+    if (!tex) {
+        return false;
+    }
+    windowInfo->GraphicSubsystemSharedTexture = dynamic_cast<FGraphicSubsystemDXGITexture*>(tex);
+    if (!windowInfo->GraphicSubsystemSharedTexture) {
+        return false;
+    }
+    flags.reset();
+    flags.set(ETextureFlag::CPU_ACCESS_WRITE);
+    flags.set(ETextureFlag::BIND_SHADER_RESOURCE);
+    windowInfo->GraphicSubsystemTexture = GraphicSubsystem->DeviceTextureCreate(GraphicSubsystemDevice, windowInfo->SharedInfo->render_width, windowInfo->SharedInfo->render_height,
+        ConvertDXGITextureFormat((DXGI_FORMAT)windowInfo->Owner->shared_hook_info->format), 1, nullptr, flags);
+    if (!windowInfo->GraphicSubsystemTexture) {
+        ReleaseWindowTexture(windowInfo);
+        return false;
+    }
+    return true;
+}
+
+bool FGameCaptureWindows::DuplicateWindowTextureHandle(LocalHookWindowInfo_t* windowInfo)
+{
+    windowInfo->SharedInfo->bNT_shared = windowInfo->GraphicSubsystemSharedTexture->IsNTShared();
+    HANDLE outHandle = (HANDLE)(intptr_t)windowInfo->GraphicSubsystemSharedTexture->GetSharedHandle();
+    if (windowInfo->SharedInfo->bNT_shared) {
+        HANDLE TargetHandle = (HANDLE)(intptr_t)windowInfo->GraphicSubsystemSharedTexture->GetSharedHandle();
+        auto bres = DuplicateHandle(GetCurrentProcess(), TargetHandle,
+            windowInfo->Owner->windowsProcess, &outHandle, 0, FALSE, DUPLICATE_SAME_ACCESS);
+        if (!bres) {
+            auto err = GetLastError();
+            SIMPLELOG_LOGGER_ERROR(nullptr, "DuplicateHandle failed:{}", err);
+            return false;
+        }
+    }
+    windowInfo->SharedInfo->shared_handle = (intptr_t)outHandle;
+    return true;
 }
 
 bool FGameCaptureWindows::IsCapturing(LocalHookInfo_t* info)

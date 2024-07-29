@@ -15,6 +15,13 @@ struct LocalHookInfo_t;
 struct LocalHookWindowInfo_t;
 class FGraphicSubsystemDXGITexture;
 class FGraphicSubsystemTexture;
+
+typedef struct SyncWindowTextureCache_t {
+	FGraphicSubsystemDXGITexture* GraphicSubsystemSharedTexture{ nullptr };
+	FGraphicSubsystemTexture* GraphicSubsystemTexture{ nullptr };
+
+}SyncWindowTextureCache_t;
+
 typedef struct LocalHookWindowInfo_t :CaptureWindowHandle_t {
 	bool bRequestRemove{ false };
 	hook_window_info_t* SharedInfo;
@@ -23,6 +30,10 @@ typedef struct LocalHookWindowInfo_t :CaptureWindowHandle_t {
 	std::shared_ptr<LocalHookInfo_t> Owner;
 	FGraphicSubsystemDXGITexture* GraphicSubsystemSharedTexture{nullptr};
 	FGraphicSubsystemTexture* GraphicSubsystemTexture{nullptr};
+
+	bool bRequestSyncWindowTexture{ false };
+	SyncWindowTextureCache_t SyncWindowTextureCache;
+	RPCHandle_t UpdateWindowTextureRpcHandle;
 	~LocalHookWindowInfo_t() override;
 	uint64_t GetID() const override {
 		return WindowID;
@@ -91,10 +102,15 @@ public:
 	bool Init(const char* workpath) override;
 	ThroughCRTWrapper<std::shared_ptr<CaptureProcessHandle_t>> StartCapture(uint64_t processid) override;
 	ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> AddOverlayWindow(CaptureProcessHandle_t* handle,const hook_window_info_t info) override;
+	bool UpdateOverlayWindowTextureSize(CaptureWindowHandle_t* windowHanlde, uint16_t width, uint16_t height) override;
 	void RemoveOverlayWindow(CaptureWindowHandle_t* windowHanlde) override;
 	bool CopyData(CaptureWindowHandle_t* handle, const uint8_t* data) override;
 
 private:
+	void ReleaseWindowTexture(LocalHookWindowInfo_t* windowInfo);
+	void ReleaseSyncWindowTextureCache(SyncWindowTextureCache_t Cache);
+	bool InterUpdateOverlayWindowTextureSize(LocalHookWindowInfo_t* windowInfo);
+	bool DuplicateWindowTextureHandle(LocalHookWindowInfo_t* windowInfo);
 	bool IsCapturing(LocalHookInfo_t* info);
 	bool FinishCapture(LocalHookInfo_t* info, ECaptureError errorcode,const char* message=nullptr);
 	bool InitHook(LocalHookInfo_t* info);
