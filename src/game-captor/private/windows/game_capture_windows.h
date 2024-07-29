@@ -104,6 +104,8 @@ public:
 	ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> AddOverlayWindow(CaptureProcessHandle_t* handle,const hook_window_info_t info) override;
 	bool UpdateOverlayWindowTextureSize(CaptureWindowHandle_t* windowHanlde, uint16_t width, uint16_t height) override;
 	void RemoveOverlayWindow(CaptureWindowHandle_t* windowHanlde) override;
+	void ShowOverlayWindow(CaptureWindowHandle_t* windowHanlde) override;
+	void HideOverlayWindow(CaptureWindowHandle_t* windowHanlde) override;
 	bool CopyData(CaptureWindowHandle_t* handle, const uint8_t* data) override;
 
 private:

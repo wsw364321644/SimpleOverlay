@@ -379,6 +379,28 @@ void FGameCaptureWindows::RemoveOverlayWindow( CaptureWindowHandle_t* windowHanl
         });
 }
 
+void FGameCaptureWindows::ShowOverlayWindow(CaptureWindowHandle_t* windowHanlde)
+{
+    auto winId = windowHanlde->GetID();
+    auto windowItr = LocalWindowInfos.find(winId);
+    if (windowItr == LocalWindowInfos.end()) {
+        return;
+    }
+    auto& pLocalWindowInfo = windowItr->second;
+    pLocalWindowInfo->SharedInfo->bShow = true;
+}
+
+void FGameCaptureWindows::HideOverlayWindow(CaptureWindowHandle_t* windowHanlde)
+{
+    auto winId = windowHanlde->GetID();
+    auto windowItr = LocalWindowInfos.find(winId);
+    if (windowItr == LocalWindowInfos.end()) {
+        return;
+    }
+    auto& pLocalWindowInfo = windowItr->second;
+    pLocalWindowInfo->SharedInfo->bShow = false;
+}
+
 bool FGameCaptureWindows::CopyData(CaptureWindowHandle_t* handle, const uint8_t* data)
 {
     auto itr = LocalWindowInfos.find(handle->GetID());
