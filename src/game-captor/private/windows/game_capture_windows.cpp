@@ -614,7 +614,7 @@ bool FGameCaptureWindows::AttemptExistingHook(LocalHookInfo_t* info)
     info->hook_restart = open_event_plus_id(EVENT_CAPTURE_RESTART, info->processid,false);
     if (info->hook_restart) {
         char szProcessName[MAX_PATH] = TEXT("<unknown>");
-        get_process_file_name_by_handle(info->windowsProcess, szProcessName, MAX_PATH);
+        get_process_file_name_by_handle(info->windowsProcess,NULL, szProcessName, MAX_PATH);
         SIMPLELOG_LOGGER_INFO(nullptr,"existing hook found, signaling process: {}", szProcessName);
         SetEvent(info->hook_restart);
         info->status = ECaptureStatus::ECS_HookSyncing;
