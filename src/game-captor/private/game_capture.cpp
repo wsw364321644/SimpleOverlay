@@ -1,5 +1,5 @@
 #include "game_capture.h"
-#include <INIReader.h>
+#include <cpp/INIReader.h>
 #include <chrono>
 #include <HOOK/hook_info.h>
 

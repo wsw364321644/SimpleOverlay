@@ -6,7 +6,7 @@
 #include <RPC/JrpcHookHelper.h>
 #include <windows_helper.h>
 #include <sm_util.h>
-#include <INIReader.h>
+#include <cpp/INIReader.h>
 #include <filesystem>
 #include <LoggerHelper.h>
 #include <Psapi.h>
@@ -175,7 +175,7 @@ bool FGameCaptureWindows::Init(const char* workpath)
                 return;
             }
             std::string* pstrbuf = new std::string;
-            ChildProcessManager.RegisterOnRead(handle, [&](CommonHandle_t handle, const char* str, ssize_t size) {
+            ChildProcessManager.RegisterOnRead(handle, [&](CommonHandle_t handle, const char* str, int64_t size) {
                 {
                     auto& strbuf = *pstrbuf;
                     if (size >= 0) {
@@ -209,7 +209,7 @@ bool FGameCaptureWindows::Init(const char* workpath)
                 return;
             }
             std::string* pstrbuf = new std::string;
-            ChildProcessManager.RegisterOnRead(handle, [&](CommonHandle_t handle, const char* str, ssize_t size) {
+            ChildProcessManager.RegisterOnRead(handle, [&](CommonHandle_t handle, const char* str, int64_t size) {
                 {
                     auto& strbuf = *pstrbuf;
                     if (size >= 0) {

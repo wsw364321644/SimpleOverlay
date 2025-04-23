@@ -20,7 +20,7 @@ int main() {
         return 0;
     }
     //auto handle=find_window_by_title("D9GameWindow");
-    auto handle=find_window_by_title("dx11app");
+    auto handle=find_window_by_title("HDR");
     if (handle == NULL) {
         return 0;
     }
