@@ -89,7 +89,7 @@ bool FGameCaptureWindows::Init(const char* workpath)
             auto HookHelperEventInterface = PRPCProcesser->GetInterface<JRPCHookHelperEventAPI>();
             auto HookHelperInterface = PRPCProcesser->GetInterface<JRPCHookHelperAPI>();
             HookHelperInterface->RegisterConnectToHost(
-                [&,HookHelperInterface, HookHelperEventInterface](RPCHandle_t handle,uint64_t processId, const char* commandline) {
+                [&,HookHelperInterface, HookHelperEventInterface](RPCHandle_t handle,uint64_t processId, std::string_view commandline) {
                     if (HookInfos.find(processId) == HookInfos.end()) {
                         HookHelperInterface->RespondError(handle,-1);
                         return;
@@ -305,7 +305,7 @@ ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::A
         [windowInfo](RPCHandle_t handle) {
             windowInfo->UpdateWindowTextureRpcHandle = NullHandle;
         },
-        [windowInfo](RPCHandle_t, int64_t code, const char*, const char*) {
+        [windowInfo](RPCHandle_t, int64_t code, std::string_view, std::string_view) {
             SIMPLELOG_LOGGER_DEBUG(nullptr, "AddWindow rpc error:{}", code);
             windowInfo->UpdateWindowTextureRpcHandle = NullHandle;
         });
@@ -374,7 +374,7 @@ void FGameCaptureWindows::RemoveOverlayWindow( CaptureWindowHandle_t* windowHanl
             ReleaseWindowTexture(pLocalWindowInfo.get());
             LocalWindowInfos.erase(pLocalWindowInfo->GetID());
         },
-        [&, pLocalWindowInfo](RPCHandle_t, int64_t, const char*, const char*) {
+        [&, pLocalWindowInfo](RPCHandle_t, int64_t, std::string_view, std::string_view) {
             pLocalWindowInfo->bRequestRemove = false;
         });
 }
@@ -493,7 +493,7 @@ void FGameCaptureWindows::CaptureTick(float seconds)
                             ReleaseSyncWindowTextureCache(SyncWindowTextureCache);
                             pWinInfo->UpdateWindowTextureRpcHandle = NullHandle;
                         },
-                        [&, pWinInfo, SyncWindowTextureCache](RPCHandle_t, int64_t code, const char*, const char*) {
+                        [&, pWinInfo, SyncWindowTextureCache](RPCHandle_t, int64_t code, std::string_view, std::string_view) {
                             SIMPLELOG_LOGGER_DEBUG(nullptr, "UpdateWindowTexture failed error:{}", code);
                             ReleaseSyncWindowTextureCache(SyncWindowTextureCache);
                             pWinInfo->UpdateWindowTextureRpcHandle = NullHandle;
@@ -614,7 +614,7 @@ bool FGameCaptureWindows::AttemptExistingHook(LocalHookInfo_t* info)
     info->hook_restart = open_event_plus_id(EVENT_CAPTURE_RESTART, info->processid,false);
     if (info->hook_restart) {
         char szProcessName[MAX_PATH] = TEXT("<unknown>");
-        get_process_file_name_by_handle(info->windowsProcess,NULL, szProcessName, MAX_PATH);
+        get_process_file_name_from_handle(info->windowsProcess,NULL, szProcessName, MAX_PATH);
         SIMPLELOG_LOGGER_INFO(nullptr,"existing hook found, signaling process: {}", szProcessName);
         SetEvent(info->hook_restart);
         info->status = ECaptureStatus::ECS_HookSyncing;
