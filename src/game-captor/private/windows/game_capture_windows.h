@@ -90,8 +90,8 @@ typedef struct LocalHookInfo_t :CaptureProcessHandle_t {
 
 typedef struct SessionInfo_t{
 	IMessageSession* Session;
-	std::shared_ptr<MessageProcesser> PMessageProcesser;
-	std::shared_ptr<RPCProcesser> PRPCProcesser;
+	std::shared_ptr<FMessageProcesser> PMessageProcesser;
+	std::shared_ptr<FJRPCProcesser> PRPCProcesser;
 	uint64_t ProcessId;
 }SessionInfo_t;
 

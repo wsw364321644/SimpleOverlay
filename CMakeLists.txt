@@ -7,7 +7,7 @@ set(MY_PRODUCT_VERSION 0)
 set(MY_BUILD_NUMBER 0)
 set(VERSION "${MY_PRODUCT_NUMBER}.${MY_PRODUCT_VERSION}.${MY_BUILD_NUMBER}")
 
-set(OVERLAY_UTIL_TAG 9797e037df6d75c1326ec19e434c8b36a66b9822)
+set(OVERLAY_UTIL_TAG 6b6542bf95f010830279bb20a058ad70ba063dfe)
 
 project(simple_overlay VERSION ${VERSION})
 enable_language(CXX ASM)
@@ -56,7 +56,7 @@ install(
 
 FetchContent_Declare(
   overlay-util
-  GIT_REPOSITORY git@ssh.github.com:wsw364321644/overlay-util.git
+  GIT_REPOSITORY https://github.com/wsw364321644/overlay-util.git
   GIT_TAG ${OVERLAY_UTIL_TAG}
   GIT_SUBMODULES_RECURSE true
 )
