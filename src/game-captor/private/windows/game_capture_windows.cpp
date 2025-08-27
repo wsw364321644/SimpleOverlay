@@ -64,6 +64,8 @@ bool FGameCaptureWindows::Init(const char* workpath)
         [&](IMessageSession* session) {
             auto PMessageProcesser = std::make_shared<FMessageProcesser>(session);
             std::shared_ptr<FJRPCProcesser> PRPCProcesser = std::make_shared<FJRPCProcesser>(PMessageProcesser.get());
+            PRPCProcesser->AddGroupRPC(JRPCHookHelperAPI::GetGroupName());
+            PRPCProcesser->AddGroupRPC(JRPCHookHelperEventAPI::GetGroupName());
             auto rp = sessionMap.emplace(std::piecewise_construct, std::make_tuple(session->GetPID()), std::make_tuple(session,PMessageProcesser, PRPCProcesser, session->GetPID()));
             if (!rp.second) {
                 SIMPLELOG_LOGGER_ERROR(nullptr, "add MessageProcesser error");
