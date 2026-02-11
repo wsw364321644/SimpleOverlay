@@ -1,12 +1,11 @@
 #include "game_capture_windows.h"
 #include <ChildProcessManager.h>
 #include <LoggerHelper.h>
+#include <mutex_util.h>
 #include <HOOK/hook_synchronized.h>
 #include <RPC/JrpcHookHelperEvent.h>
 #include <RPC/JrpcHookHelper.h>
 #include <windows_helper.h>
-#include <sm_util.h>
-#include <cpp/INIReader.h>
 #include <filesystem>
 #include <LoggerHelper.h>
 #include <Psapi.h>
@@ -31,10 +30,10 @@ FGameCapture* FGameCapture::CreateGameCapture()
 
 LocalHookWindowInfo_t::~LocalHookWindowInfo_t()
 {
-    if (SharedInfo) {
-        UnmapSharedMemory(SharedInfo);
-    }
     if (SharedMemHandle) {
+        if (SharedInfo) {
+            UnmapSharedMemory(SharedMemHandle, SharedInfo);
+        }
         CloseSharedMemory(SharedMemHandle);
     }
 }
@@ -171,13 +170,13 @@ bool FGameCaptureWindows::Init(const char* workpath)
                 return;
             }
 
-            FChildProcessManager ChildProcessManager;
+            auto& ChildProcessManager=*IChildProcessManager::GetSingleton();
             auto handle = ChildProcessManager.SpawnProcess((char*)fpath.u8string().c_str());
             if (ChildProcessManager.CheckIsFinished(handle)) {
                 return;
             }
             std::string* pstrbuf = new std::string;
-            ChildProcessManager.RegisterOnRead(handle, [&](CommonHandle_t handle, const char* str, int64_t size) {
+            ChildProcessManager.RegisterOnRead(handle, [&](CommonHandle32_t handle, const char* str, int64_t size) {
                 {
                     auto& strbuf = *pstrbuf;
                     if (size >= 0) {
@@ -188,7 +187,7 @@ bool FGameCaptureWindows::Init(const char* workpath)
                 }
             );
             ChildProcessManager.RegisterOnExit(handle,
-                [&](CommonHandle_t, int64_t, int) {
+                [&](CommonHandle32_t, int64_t, int) {
                     auto& strbuf = *pstrbuf;
                     load_offsets_from_string(&offsets64, strbuf.c_str());
                     delete pstrbuf;
@@ -205,13 +204,13 @@ bool FGameCaptureWindows::Init(const char* workpath)
                 return;
             }
 
-            FChildProcessManager ChildProcessManager;
+            auto& ChildProcessManager = *IChildProcessManager::GetSingleton();
             auto handle = ChildProcessManager.SpawnProcess((char*)fpath.u8string().c_str());
             if (ChildProcessManager.CheckIsFinished(handle)) {
                 return;
             }
             std::string* pstrbuf = new std::string;
-            ChildProcessManager.RegisterOnRead(handle, [&](CommonHandle_t handle, const char* str, int64_t size) {
+            ChildProcessManager.RegisterOnRead(handle, [&](CommonHandle32_t handle, const char* str, int64_t size) {
                 {
                     auto& strbuf = *pstrbuf;
                     if (size >= 0) {
@@ -222,7 +221,7 @@ bool FGameCaptureWindows::Init(const char* workpath)
                 }
             );
             ChildProcessManager.RegisterOnExit(handle,
-                [&](CommonHandle_t, int64_t, int) {
+                [&](CommonHandle32_t, int64_t, int) {
                     auto& strbuf = *pstrbuf;
                     load_offsets_from_string(&offsets32, strbuf.c_str());
                     delete pstrbuf;
@@ -286,7 +285,7 @@ ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::A
     windowInfo->Owner = plocalInfo;
     windowInfo->WindowID= newWindowID;
     windowInfo->SharedMemHandle= CreateSharedMemory(GetNamePlusID(SHMEM_HOOK_WINDOW_INFO, newWindowID).c_str(),sizeof(hook_window_info_t));
-    if (!windowInfo->SharedMemHandle || !windowInfo->SharedMemHandle->IsValid()) {
+    if (!windowInfo->SharedMemHandle || !windowInfo->SharedMemHandle.IsValid()) {
         return nullptr;
     }
     windowInfo->SharedInfo = (hook_window_info_t*)MapSharedMemory(windowInfo->SharedMemHandle);
@@ -463,9 +462,10 @@ void FGameCaptureWindows::CaptureTick(float seconds)
             if (!sessionMap.contains(hookInfo->GetID())) {
                 continue;
             }
-            auto handle=open_mutex_plus_id(HOOK_READY_KEEPALIVE, hookInfo->GetID(), false);
-            if (handle != NULL) {
-                CloseHandle(handle);
+            std::error_code ec;
+            auto handle=utilpp::OpenProcMutex(GetNamePlusID(HOOK_READY_KEEPALIVE, hookInfo->GetID()), ec);
+            if (handle.IsValid()) {
+                utilpp::CloseProcMutex(handle,ec);
                 hookInfo->status = ECaptureStatus::ECS_Ready;
                 hookInfo->TriggerOnGraphicDataUpdateDelegates(std::dynamic_pointer_cast<CaptureProcessHandle_t>(hookInfo));
             }
@@ -473,9 +473,10 @@ void FGameCaptureWindows::CaptureTick(float seconds)
             break;
         }
         case ECaptureStatus::ECS_Ready:{
-            auto handle = open_mutex_plus_id(HOOK_READY_KEEPALIVE, hookInfo->GetID(), false);
-            if (handle != NULL) {
-                CloseHandle(handle);
+            std::error_code ec;
+            auto handle = utilpp::OpenProcMutex(GetNamePlusID(HOOK_READY_KEEPALIVE, hookInfo->GetID()), ec);
+            if (handle.IsValid()) {
+                utilpp::CloseProcMutex(handle, ec);
             }
             else {
                 hookInfo->status = ECaptureStatus::ECS_GraphicDataSyncing;
@@ -603,9 +604,10 @@ bool FGameCaptureWindows::InitHook(LocalHookInfo_t* localInfo)
         return false;
     }
     localInfo->b64bit = is_64bit_process(localInfo->windowsProcess);
-    localInfo->keepalive_mutex = create_mutex_plus_id(WINDOW_HOOK_KEEPALIVE, localInfo->processid,false);
+    std::error_code ec;
+    localInfo->keepalive_mutex = utilpp::CreateProcMutex(GetNamePlusID( WINDOW_HOOK_KEEPALIVE, localInfo->processid),ec);
     if (!localInfo->keepalive_mutex) {
-        SIMPLELOG_LOGGER_ERROR(nullptr,"Failed to create keepalive mutex: {}", GetLastError());
+        SIMPLELOG_LOGGER_ERROR(nullptr,"Failed to create keepalive mutex: {}", ec.message());
         return false;
     }
     return true;
@@ -613,12 +615,13 @@ bool FGameCaptureWindows::InitHook(LocalHookInfo_t* localInfo)
 
 bool FGameCaptureWindows::AttemptExistingHook(LocalHookInfo_t* info)
 {
-    info->hook_restart = open_event_plus_id(EVENT_CAPTURE_RESTART, info->processid,false);
+    std::error_code ec;
+    info->hook_restart = utilpp::OpenProcEvent(GetNamePlusID(EVENT_CAPTURE_RESTART, info->processid),ec);
     if (info->hook_restart) {
         char szProcessName[MAX_PATH] = TEXT("<unknown>");
         get_process_file_name_from_handle(info->windowsProcess,NULL, szProcessName, MAX_PATH);
         SIMPLELOG_LOGGER_INFO(nullptr,"existing hook found, signaling process: {}", szProcessName);
-        SetEvent(info->hook_restart);
+        utilpp::SetProcEvent(info->hook_restart,ec);
         info->status = ECaptureStatus::ECS_HookSyncing;
         return true;
     }
@@ -685,7 +688,7 @@ bool FGameCaptureWindows::InjectHook(LocalHookInfo_t* info)
         return false;
     }
 
-    FChildProcessManager ChildProcessManager;
+    auto& ChildProcessManager = *IChildProcessManager::GetSingleton();
     auto hook_pathu8 = hook_path.u8string();
     auto processidstr=std::to_string(info->processid);
     const char* args[4]{ (const char*)hook_pathu8.c_str(),"0",processidstr.c_str(),0};
@@ -693,7 +696,7 @@ bool FGameCaptureWindows::InjectHook(LocalHookInfo_t* info)
     if (ChildProcessManager.CheckIsFinished(handle)) {
         return false;
     }
-    ChildProcessManager.RegisterOnExit(handle,[&,info](CommonHandle_t, int64_t exit_status, int signal) {
+    ChildProcessManager.RegisterOnExit(handle,[&,info](CommonHandle32_t, int64_t exit_status, int signal) {
         if (!exit_status|| int32_t(exit_status)==-4) {
             info->status = ECaptureStatus::ECS_HookSyncing;
         }
@@ -708,10 +711,11 @@ bool FGameCaptureWindows::InjectHook(LocalHookInfo_t* info)
 
 bool FGameCaptureWindows::InitHookSync(LocalHookInfo_t* info)
 {
+    std::error_code ec;
     info->status = ECaptureStatus::ECS_HookSyncing;
 
-    info->texture_mutexes[0] = open_mutex_plus_id(MUTEX_TEXTURE1, info->processid, false);
-    info->texture_mutexes[1] = open_mutex_plus_id(MUTEX_TEXTURE2, info->processid, false);
+    info->texture_mutexes[0] = utilpp::OpenProcMutex(GetNamePlusID( MUTEX_TEXTURE1, info->processid), ec);
+    info->texture_mutexes[1] = utilpp::OpenProcMutex(GetNamePlusID(MUTEX_TEXTURE2, info->processid), ec);
     if (!info->texture_mutexes[0] || !info->texture_mutexes[1]) {
         return false;
     }
@@ -723,7 +727,7 @@ bool FGameCaptureWindows::InitHookSync(LocalHookInfo_t* info)
         return false;
     }
 
-    SetEvent(info->hook_init);
+    utilpp::SetProcEvent(info->hook_init,ec);
     info->status = ECaptureStatus::ECS_GraphicDataSyncing;
     return true;
 }
@@ -731,7 +735,7 @@ bool FGameCaptureWindows::InitHookSync(LocalHookInfo_t* info)
 bool FGameCaptureWindows::InitHookInfo(LocalHookInfo_t* info)
 {
     info->shared_mem_handle = OpenSharedMemory(GetNamePlusID(SHMEM_HOOK_INFO, info->processid).c_str());
-    if (!info->shared_mem_handle || !info->shared_mem_handle->IsValid()) {
+    if (!info->shared_mem_handle) {
         return false;
     }
     info->shared_hook_info = (hook_info_t*)MapSharedMemory(info->shared_mem_handle);
@@ -755,42 +759,43 @@ bool FGameCaptureWindows::InitHookInfo(LocalHookInfo_t* info)
 
 bool FGameCaptureWindows::InitHookEvents(LocalHookInfo_t* info)
 {
+    std::error_code ec;
     if (!info->hook_restart) {
-        info->hook_restart = open_event_plus_id(EVENT_CAPTURE_RESTART, info->processid, false);
+        info->hook_restart = utilpp::OpenProcEvent(GetNamePlusID( EVENT_CAPTURE_RESTART, info->processid), ec);
         if (!info->hook_restart) {
-            SIMPLELOG_LOGGER_ERROR(nullptr,"init_events: failed to get hook_restart event: {}", GetLastError());
+            SIMPLELOG_LOGGER_ERROR(nullptr,"init_events: failed to get hook_restart event: {}", ec.message());
             return false;
         }
     }
 
     if (!info->hook_stop) {
-        info->hook_stop = open_event_plus_id(EVENT_CAPTURE_STOP, info->processid, false); 
+        info->hook_stop = utilpp::OpenProcEvent(GetNamePlusID(EVENT_CAPTURE_STOP, info->processid), ec);
         if (!info->hook_stop) {
-            SIMPLELOG_LOGGER_ERROR(nullptr, "init_events: failed to get hook_stop event: {}", GetLastError());
+            SIMPLELOG_LOGGER_ERROR(nullptr, "init_events: failed to get hook_stop event: {}", ec.message());
             return false;
         }
     }
 
     if (!info->hook_init) {
-        info->hook_init = open_event_plus_id(EVENT_HOOK_INIT, info->processid, false); 
+        info->hook_init = utilpp::OpenProcEvent(GetNamePlusID(EVENT_HOOK_INIT, info->processid), ec);
         if (!info->hook_init) {
-            SIMPLELOG_LOGGER_ERROR(nullptr, "init_events: failed to get hook_init event: {}", GetLastError());
+            SIMPLELOG_LOGGER_ERROR(nullptr, "init_events: failed to get hook_init event: {}", ec.message());
             return false;
         }
     }
 
     if (!info->hook_ready) {
-        info->hook_ready = open_event_plus_id(EVENT_HOOK_READY, info->processid, false);
+        info->hook_ready = utilpp::OpenProcEvent(GetNamePlusID(EVENT_HOOK_READY, info->processid), ec);
         if (!info->hook_ready) {
-            SIMPLELOG_LOGGER_ERROR(nullptr, "init_events: failed to get hook_ready event: {}", GetLastError());
+            SIMPLELOG_LOGGER_ERROR(nullptr, "init_events: failed to get hook_ready event: {}", ec.message());
             return false;
         }
     }
 
     if (!info->hook_exit) {
-        info->hook_exit = open_event_plus_id(EVENT_HOOK_EXIT, info->processid, false);
+        info->hook_exit = utilpp::OpenProcEvent(GetNamePlusID(EVENT_HOOK_EXIT, info->processid), ec);
         if (!info->hook_exit) {
-            SIMPLELOG_LOGGER_ERROR(nullptr, "init_events: failed to get hook_exit event: {}", GetLastError());
+            SIMPLELOG_LOGGER_ERROR(nullptr, "init_events: failed to get hook_exit event: {}", ec.message());
             return false;
         }
     }
