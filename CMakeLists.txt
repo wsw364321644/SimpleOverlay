@@ -35,13 +35,18 @@ execute_process(COMMAND ${CMAKE_COMMAND} ${CMAKE_GENERATOR_ARGV} .
 execute_process(COMMAND ${CMAKE_COMMAND} --build . --config Release
   WORKING_DIRECTORY ${OBS_DIR})
 
-install(
-  FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets32.exe"
-  "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets64.exe"
+file(
+  COPY
+  "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets32.exe"
   "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/inject-helper32.exe"
+  DESTINATION
+  "${CMAKE_SOURCE_DIR}/additional_install_files/exec32/")
+file(
+  COPY
+  "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets64.exe"
   "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/inject-helper64.exe"
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}
-)
+  DESTINATION
+  "${CMAKE_SOURCE_DIR}/additional_install_files/exec64/")
 
 FetchContent_Declare(
   overlay-util
