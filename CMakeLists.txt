@@ -11,6 +11,7 @@ set(OVERLAY_UTIL_TAG 607015bdb7e39f50c9b471e92531d7b96d8c6478)
 
 project(simple_overlay VERSION ${VERSION})
 enable_language(CXX ASM)
+include(GNUInstallDirs)
 
 option(OVERLAY_STATIC_CRT "OVERLAY STATIC CRT Build ." OFF)
 
@@ -36,22 +37,10 @@ execute_process(COMMAND ${CMAKE_COMMAND} --build . --config Release
 
 install(
   FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets32.exe"
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-)
-
-install(
-  FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets64.exe"
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-)
-
-install(
-  FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/inject-helper32.exe"
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-)
-
-install(
-  FILES "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/inject-helper64.exe"
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+  "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/get-graphics-offsets64.exe"
+  "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/inject-helper32.exe"
+  "${OBS_DIR}/_deps/obs-src/data/obs-plugins/win-capture/inject-helper64.exe"
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}
 )
 
 FetchContent_Declare(
