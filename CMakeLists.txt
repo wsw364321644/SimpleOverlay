@@ -7,13 +7,21 @@ set(MY_PRODUCT_VERSION 0)
 set(MY_BUILD_NUMBER 0)
 set(VERSION "${MY_PRODUCT_NUMBER}.${MY_PRODUCT_VERSION}.${MY_BUILD_NUMBER}")
 
-set(OVERLAY_UTIL_TAG 607015bdb7e39f50c9b471e92531d7b96d8c6478)
+set(OVERLAY_UTIL_TAG a23edd6ee15ea7d15ba3467a3e93427a201e766e)
 
 project(simple_overlay VERSION ${VERSION})
 enable_language(CXX ASM)
 include(GNUInstallDirs)
 
 option(OVERLAY_STATIC_CRT "OVERLAY STATIC CRT Build ." OFF)
+option(OVERLAY_GIT_SSH "Git port 22." OFF)
+
+if(OVERLAY_GIT_SSH)
+  set(SSH SSH)
+else()
+  unset(SSH)
+endif()
+
 
 if(PROJECT_IS_TOP_LEVEL)
   if(OVERLAY_STATIC_CRT)
@@ -56,7 +64,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(overlay-util)
 
-ImportTarget(inih SSH TAG 5cc5e2c24642513aaa5b19126aad42d0e4e0923e) # r58
+ImportTarget(inih ${SSH} TAG r62)
 
 find_package(LIBUV REQUIRED)
 add_subdirectory(src/game-captor)
