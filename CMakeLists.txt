@@ -9,7 +9,7 @@ set(VERSION "${MY_PRODUCT_NUMBER}.${MY_PRODUCT_VERSION}.${MY_BUILD_NUMBER}")
 
 set(OVERLAY_UTIL_TAG a23edd6ee15ea7d15ba3467a3e93427a201e766e)
 
-project(simple_overlay VERSION ${VERSION})
+project(SimpleOverlay VERSION ${VERSION})
 enable_language(CXX ASM)
 include(GNUInstallDirs)
 
@@ -69,3 +69,4 @@ ImportTarget(inih ${SSH} TAG r62)
 find_package(LIBUV REQUIRED)
 add_subdirectory(src/game-captor)
 add_subdirectory(src/game-captor-test)
+ExportFromInstall(${PROJECT_NAME})
