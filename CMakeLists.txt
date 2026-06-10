@@ -7,7 +7,7 @@ set(MY_PRODUCT_VERSION 0)
 set(MY_BUILD_NUMBER 0)
 set(VERSION "${MY_PRODUCT_NUMBER}.${MY_PRODUCT_VERSION}.${MY_BUILD_NUMBER}")
 
-set(OVERLAY_UTIL_TAG a23edd6ee15ea7d15ba3467a3e93427a201e766e)
+set(OVERLAY_UTIL_TAG b704845fba308dda9d115be607f9c6b0be612ecc)
 
 project(SimpleOverlay VERSION ${VERSION})
 enable_language(CXX ASM)
@@ -22,18 +22,19 @@ else()
   unset(SSH)
 endif()
 
-
-if(PROJECT_IS_TOP_LEVEL)
-  if(OVERLAY_STATIC_CRT)
-    if(MSVC)
-      set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-      add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-    endif()
-
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+if(OVERLAY_STATIC_CRT)
+  if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
   endif()
+
+  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
+    set(STATIC_CRT STATIC_CRT)
+    else()
+    unset(STATIC_CRT)
 endif()
+
 
 set(OBS_URL https://github.com/obsproject/obs-studio/releases/download/30.2.0-rc1/OBS-Studio-30.2.0-rc1-Windows.zip)
 set(OBS_DIR ${CMAKE_SOURCE_DIR}/external/obs)
@@ -64,7 +65,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(overlay-util)
 
-ImportTarget(inih ${SSH} TAG r62)
+ImportProject(inih ${STATIC_CRT} ${SSH} TAG r62)
 
 find_package(LIBUV REQUIRED)
 add_subdirectory(src/game-captor)

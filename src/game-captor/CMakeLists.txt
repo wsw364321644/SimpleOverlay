@@ -12,7 +12,7 @@ function(add_lib TARGET_NAME)
         set_target_properties(${TARGET_NAME} PROPERTIES LINK_FLAGS_RELEASE "/NODEFAULTLIB:LIBCMTD.LIB /NODEFAULTLIB:msvcrtd")
     endif()
 
-    target_link_libraries(${TARGET_NAME} PRIVATE inihpp_a)
+    target_link_libraries(${TARGET_NAME} PRIVATE inih::inihpp_a)
 
     AddTargetInclude(${TARGET_NAME})
     AddTargetInstall(${TARGET_NAME} ${PROJECT_NAME})

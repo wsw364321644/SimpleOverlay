@@ -263,6 +263,7 @@ ThroughCRTWrapper<std::shared_ptr<CaptureProcessHandle_t>> FGameCaptureWindows::
 
 ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::AddOverlayWindow(CaptureProcessHandle_t* handle, const hook_window_info_t info)
 {
+    std::error_code ec;
     auto itr=HookInfos.find(handle->GetID());
     if (itr == HookInfos.end()) {
         return nullptr;
@@ -284,8 +285,8 @@ ThroughCRTWrapper<std::shared_ptr<CaptureWindowHandle_t>> FGameCaptureWindows::A
     auto windowInfo = std::make_shared<LocalHookWindowInfo_t>();
     windowInfo->Owner = plocalInfo;
     windowInfo->WindowID= newWindowID;
-    windowInfo->SharedMemHandle= CreateSharedMemory(GetNamePlusID(SHMEM_HOOK_WINDOW_INFO, newWindowID).c_str(),sizeof(hook_window_info_t));
-    if (!windowInfo->SharedMemHandle || !windowInfo->SharedMemHandle.IsValid()) {
+    windowInfo->SharedMemHandle= CreateSharedMemory(GetNamePlusID(SHMEM_HOOK_WINDOW_INFO, newWindowID).c_str(),sizeof(hook_window_info_t), ec);
+    if (ec) {
         return nullptr;
     }
     windowInfo->SharedInfo = (hook_window_info_t*)MapSharedMemory(windowInfo->SharedMemHandle);
@@ -734,8 +735,9 @@ bool FGameCaptureWindows::InitHookSync(LocalHookInfo_t* info)
 
 bool FGameCaptureWindows::InitHookInfo(LocalHookInfo_t* info)
 {
-    info->shared_mem_handle = OpenSharedMemory(GetNamePlusID(SHMEM_HOOK_INFO, info->processid).c_str());
-    if (!info->shared_mem_handle) {
+    std::error_code ec;
+    info->shared_mem_handle = OpenSharedMemory(GetNamePlusID(SHMEM_HOOK_INFO, info->processid).c_str(), ec);
+    if (ec) {
         return false;
     }
     info->shared_hook_info = (hook_info_t*)MapSharedMemory(info->shared_mem_handle);
