@@ -15,8 +15,11 @@ function(add_lib TARGET_NAME)
     target_link_libraries(${TARGET_NAME} PRIVATE inih::inihpp_a)
 
     AddTargetInclude(${TARGET_NAME})
-    AddTargetInstall(${TARGET_NAME} ${PROJECT_NAME})
     add_library(${PROJECT_NAME}::${TARGET_NAME} ALIAS ${TARGET_NAME})
+
+    if(NOT OVERLAY_DISABLE_INSTALL)
+        AddTargetInstall(${TARGET_NAME} ${PROJECT_NAME})
+    endif()
 endfunction()
 
 set(TARGET_NAME game_captor)

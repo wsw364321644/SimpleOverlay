@@ -7,7 +7,7 @@ set(MY_PRODUCT_VERSION 0)
 set(MY_BUILD_NUMBER 0)
 set(VERSION "${MY_PRODUCT_NUMBER}.${MY_PRODUCT_VERSION}.${MY_BUILD_NUMBER}")
 
-set(OVERLAY_UTIL_TAG b704845fba308dda9d115be607f9c6b0be612ecc)
+set(OVERLAY_UTIL_TAG 69a87b210233126144373099a1f69f00e7070b61)
 
 project(SimpleOverlay VERSION ${VERSION})
 enable_language(CXX ASM)
@@ -15,6 +15,7 @@ include(GNUInstallDirs)
 
 option(OVERLAY_STATIC_CRT "OVERLAY STATIC CRT Build ." OFF)
 option(OVERLAY_GIT_SSH "Git port 22." OFF)
+option(OVERLAY_DISABLE_INSTALL "disable install." OFF)
 
 if(OVERLAY_GIT_SSH)
   set(SSH SSH)
@@ -30,9 +31,9 @@ if(OVERLAY_STATIC_CRT)
 
   set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
-    set(STATIC_CRT STATIC_CRT)
-    else()
-    unset(STATIC_CRT)
+  set(STATIC_CRT STATIC_CRT)
+else()
+  unset(STATIC_CRT)
 endif()
 
 
@@ -70,4 +71,7 @@ ImportProject(inih ${STATIC_CRT} ${SSH} TAG r62)
 find_package(LIBUV REQUIRED)
 add_subdirectory(src/game-captor)
 add_subdirectory(src/game-captor-test)
-ExportFromInstall(${PROJECT_NAME})
+
+if(NOT OVERLAY_DISABLE_INSTALL)
+  ExportFromInstall(${PROJECT_NAME})
+endif()
