@@ -61,22 +61,25 @@ bool FGameCaptureWindows::Init(const char* workpath)
     IpcServer->OpenServer(EMessageConnectionType::EMCT_IPC, HOOK_IPC_PIPE);
     IpcServer->AddOnConnectDelegate(
         [&](IMessageSession* session) {
-            auto PMessageProcesser = std::make_shared<FMessageProcesser>(session);
-            std::shared_ptr<FJRPCProcesser> PRPCProcesser = std::make_shared<FJRPCProcesser>(PMessageProcesser.get());
+            auto pMessageProcesser = std::make_shared<FMessageProcesser>(session);
+            std::shared_ptr<FJRPCProcesser> PRPCProcesser = std::make_shared<FJRPCProcesser>();
+            PRPCProcesser->Init(
+                [pMessageProcesser](std::shared_ptr<IRPCSerializable> rpc, std::error_code& ec)->bool {
+                    auto& buf = *FCharBuffer::GetThreadSingleton();
+                    rpc->ToBytes(buf);
+                    return pMessageProcesser->SendContent(buf.Data(), buf.Size(), 0);
+
+                }
+            );
             PRPCProcesser->AddGroupRPC(JRPCHookHelperAPI::GetGroupName());
             PRPCProcesser->AddGroupRPC(JRPCHookHelperEventAPI::GetGroupName());
-            auto rp = sessionMap.emplace(std::piecewise_construct, std::make_tuple(session->GetPID()), std::make_tuple(session,PMessageProcesser, PRPCProcesser, session->GetPID()));
+            auto rp = sessionMap.emplace(std::piecewise_construct, std::make_tuple(session->GetPID()), std::make_tuple(session, pMessageProcesser, PRPCProcesser, session->GetPID()));
             if (!rp.second) {
                 SIMPLELOG_LOGGER_ERROR(nullptr, "add MessageProcesser error");
                 return;
             }
             SessionInfo_t& SessionInfo= rp.first->second;
-            PRPCProcesser->AddOnRPCConsumedErrorDelegate(
-                [&, session, PRPCProcesser](std::shared_ptr<RPCRequest>) {
 
-                    session->Disconnect();
-                }
-            );
             session->AddOnDisconnectDelegate(
                 [&](IMessageSession* session) {
                     sessionMap.erase(session->GetPID());
